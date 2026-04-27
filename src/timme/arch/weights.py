@@ -92,8 +92,24 @@ def remap_state_dict(
         if target == 'classifier':
             out[remapped] = value
         elif target == 'encoder' and matched_side == 'encoder':
-            out[remapped] = value
+            # Strip the leading 'encoder.' so the key lands on a bare encoder.
+            out[_strip_namespace(remapped, 'encoder')] = value
         elif target == 'head' and matched_side == 'head':
-            out[remapped] = value
+            # Strip leading 'head.' / 'head_dist.' for bare-head loading.
+            # First segment is the namespace ('head' or 'head_dist').
+            ns = remapped.split('.', 1)[0]
+            out[_strip_namespace(remapped, ns)] = value
 
     return out
+
+
+def _strip_namespace(key: str, namespace: str) -> str:
+    """Return key with a leading ``{namespace}.`` removed, or unchanged
+    if it doesn't start with that prefix (defensive — shouldn't happen
+    given how remap routes targets to namespaces)."""
+    prefix = namespace + '.'
+    if key.startswith(prefix):
+        return key[len(prefix):]
+    if key == namespace:
+        return ''
+    return key

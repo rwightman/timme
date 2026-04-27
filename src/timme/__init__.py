@@ -53,6 +53,8 @@ from .models import (
     MobileNetV3Cfg, MOBILENETV3_CFGS,
     ByoBlockCfg, ByoModelCfg,
     LevitCfg, LEVIT_CFGS,
+    NaFlexVitCfg, NAFLEXVIT_CFGS,
+    EvaCfg, EVA_CFGS,
 )
 
 __version__ = '0.0.1'

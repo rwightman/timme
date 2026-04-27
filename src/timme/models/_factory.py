@@ -125,17 +125,37 @@ def _remap_single_key(key: str, layout: WeightLayout) -> str:
     return key
 
 
-def _adjust_pretrained_cfg(pcfg: Dict[str, Any], layout: WeightLayout) -> Dict[str, Any]:
-    """Rewrite first_conv / classifier keys to match the timme namespace."""
+def _adjust_pretrained_cfg(
+        pcfg: Dict[str, Any],
+        layout: WeightLayout,
+        target: str = 'classifier',
+) -> Dict[str, Any]:
+    """Rewrite first_conv / classifier keys to match the timme namespace.
+
+    For target='encoder', strip the leading 'encoder.' prefix so the
+    keys land on a bare-encoder load (since the encoder's own state_dict
+    has no namespace prefix).
+    """
     out = dict(pcfg)
+
+    def _rewrite(name: str) -> str:
+        new = _remap_single_key(name, layout)
+        if target == 'encoder' and new.startswith('encoder.'):
+            return new[len('encoder.'):]
+        if target == 'head':
+            for ns in ('head.', 'head_dist.'):
+                if new.startswith(ns):
+                    return new[len(ns):]
+        return new
+
     for field in ('first_conv', 'classifier'):
         v = out.get(field)
         if v is None:
             continue
         if isinstance(v, str):
-            out[field] = _remap_single_key(v, layout)
+            out[field] = _rewrite(v)
         elif isinstance(v, (list, tuple)):
-            out[field] = type(v)(_remap_single_key(x, layout) for x in v)
+            out[field] = type(v)(_rewrite(x) for x in v)
     return out
 
 
@@ -205,7 +225,7 @@ def create_encoder(
     encoder.default_cfg = pcfg
 
     if pretrained and pcfg:
-        adjusted_pcfg = _adjust_pretrained_cfg(pcfg, entry.weight_layout)
+        adjusted_pcfg = _adjust_pretrained_cfg(pcfg, entry.weight_layout, target='encoder')
         filter_fn = _make_filter_fn(entry, target='encoder')
         # For encoder-only, strip classifier key — there's no head to load.
         adjusted_pcfg = dict(adjusted_pcfg, classifier=None)

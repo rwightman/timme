@@ -26,6 +26,8 @@ from .convnext import ConvNeXtCfg, CONVNEXT_CFGS
 from .mobilenetv3 import MobileNetV3Cfg, MOBILENETV3_CFGS
 from .byobnet import ByoBlockCfg, ByoModelCfg
 from .levit import LevitCfg, LEVIT_CFGS
+from .naflexvit import NaFlexVitCfg, NAFLEXVIT_CFGS
+from .eva import EvaCfg, EVA_CFGS
 from . import deit  # noqa: F401  (registers; no separate cfg dataclass — reuses VisionTransformerCfg)
 
 __all__ = [
@@ -40,4 +42,6 @@ __all__ = [
     'MobileNetV3Cfg', 'MOBILENETV3_CFGS',
     'ByoBlockCfg', 'ByoModelCfg',
     'LevitCfg', 'LEVIT_CFGS',
+    'NaFlexVitCfg', 'NAFLEXVIT_CFGS',
+    'EvaCfg', 'EVA_CFGS',
 ]
