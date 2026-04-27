@@ -197,10 +197,8 @@ class NaFlexVit(ImageEncoder):
 
         if cfg is None:
             from dataclasses import fields as _fields
-            cfg = NaFlexVitCfg(**{
-                k: v for k, v in kwargs.items()
-                if k in {f.name for f in _fields(NaFlexVitCfg)}
-            })
+
+            cfg = NaFlexVitCfg(**{k: v for k, v in kwargs.items() if k in {f.name for f in _fields(NaFlexVitCfg)}})
         else:
             cfg = cfg.overlay(**kwargs)
 
@@ -257,6 +255,7 @@ class NaFlexVit(ImageEncoder):
                 RotaryEmbeddingDinoV3,
                 RotaryEmbeddingMixed,
             )
+
             if cfg.rope_type == 'mixed':
                 self.rope = RotaryEmbeddingMixed(
                     cfg.embed_dim,
@@ -324,8 +323,7 @@ class NaFlexVit(ImageEncoder):
         ])
         patch_reduction = self.embeds.feat_ratio(as_scalar=True)
         self.feature_info = FeatureInfo(
-            [dict(module=f'blocks.{i}', num_chs=cfg.embed_dim, reduction=patch_reduction)
-             for i in range(cfg.depth)],
+            [dict(module=f'blocks.{i}', num_chs=cfg.embed_dim, reduction=patch_reduction) for i in range(cfg.depth)],
             out_indices=out_indices or (cfg.depth - 1,),
         )
 
@@ -359,6 +357,7 @@ class NaFlexVit(ImageEncoder):
 
     def fix_init_weight(self) -> None:
         """Apply per-layer-id rescaling to attention proj + MLP fc2."""
+
         def rescale(param: torch.Tensor, _layer_id: int) -> None:
             with torch.no_grad():
                 param.div_(math.sqrt(2.0 * _layer_id))
@@ -490,7 +489,10 @@ class NaFlexVit(ImageEncoder):
                 patch_valid = patch_valid.gather(1, keep_indices)
             if rope_embeds is not None and not self.rope_is_mixed:
                 rope_embeds = apply_keep_indices_nlc(
-                    x, rope_embeds, keep_indices, pos_embed_has_batch=naflex_mode,
+                    x,
+                    rope_embeds,
+                    keep_indices,
+                    pos_embed_has_batch=naflex_mode,
                 )
                 if not naflex_mode:
                     rope_embeds = rope_embeds.unsqueeze(1)
@@ -541,7 +543,10 @@ class NaFlexVit(ImageEncoder):
             for _i, (blk, rope_embed) in enumerate(zip(self.blocks, rope_embeds)):
                 if self.training and self.patch_drop is not None and keep_indices is not None:
                     rope_embed = apply_keep_indices_nlc(
-                        x, rope_embed, keep_indices, pos_embed_has_batch=naflex_mode,
+                        x,
+                        rope_embed,
+                        keep_indices,
+                        pos_embed_has_batch=naflex_mode,
                     )
                 if do_checkpointing:
                     x = checkpoint(blk, x, rope=rope_embed, attn_mask=attn_mask)
@@ -619,7 +624,9 @@ class NaFlexVit(ImageEncoder):
             for i, (blk, rope_embed) in enumerate(zip(self.blocks, rope_embeds)):
                 if self.training and self.patch_drop is not None and keep_indices is not None:
                     rope_embed = apply_keep_indices_nlc(
-                        x, rope_embed, keep_indices,
+                        x,
+                        rope_embed,
+                        keep_indices,
                         pos_embed_has_batch=embeds.get('naflex_mode', False),
                     )
                 if do_checkpointing:
@@ -650,10 +657,7 @@ class NaFlexVit(ImageEncoder):
             prefix_tokens = None
 
         if reshape:
-            intermediates = [
-                y.reshape(y.shape[0], H, W, -1).permute(0, 3, 1, 2).contiguous()
-                for y in intermediates
-            ]
+            intermediates = [y.reshape(y.shape[0], H, W, -1).permute(0, 3, 1, 2).contiguous() for y in intermediates]
 
         if output_dict:
             result_dict: Dict[str, Any] = {'image_intermediates': intermediates}
@@ -747,39 +751,86 @@ NAFLEXVIT_WEIGHT_LAYOUT = WeightLayout(
 
 NAFLEXVIT_CFGS: Dict[str, NaFlexVitCfg] = {
     'naflexvit_base_patch16_gap': NaFlexVitCfg(
-        patch_size=16, embed_dim=768, depth=12, num_heads=12,
-        init_values=1e-5, global_pool='avg', reg_tokens=4, fc_norm=True,
+        patch_size=16,
+        embed_dim=768,
+        depth=12,
+        num_heads=12,
+        init_values=1e-5,
+        global_pool='avg',
+        reg_tokens=4,
+        fc_norm=True,
     ),
     'naflexvit_base_patch16_par_gap': NaFlexVitCfg(
-        patch_size=16, embed_dim=768, depth=12, num_heads=12,
-        init_values=1e-5, pos_embed_ar_preserving=True,
-        global_pool='avg', reg_tokens=4, fc_norm=True,
+        patch_size=16,
+        embed_dim=768,
+        depth=12,
+        num_heads=12,
+        init_values=1e-5,
+        pos_embed_ar_preserving=True,
+        global_pool='avg',
+        reg_tokens=4,
+        fc_norm=True,
     ),
     'naflexvit_base_patch16_parfac_gap': NaFlexVitCfg(
-        patch_size=16, embed_dim=768, depth=12, num_heads=12,
-        init_values=1e-5, pos_embed_ar_preserving=True, pos_embed='factorized',
-        global_pool='avg', reg_tokens=4, fc_norm=True,
+        patch_size=16,
+        embed_dim=768,
+        depth=12,
+        num_heads=12,
+        init_values=1e-5,
+        pos_embed_ar_preserving=True,
+        pos_embed='factorized',
+        global_pool='avg',
+        reg_tokens=4,
+        fc_norm=True,
     ),
     'naflexvit_base_patch16_map': NaFlexVitCfg(
-        patch_size=16, embed_dim=768, depth=12, num_heads=12,
-        init_values=1e-5, global_pool='map', reg_tokens=1,
+        patch_size=16,
+        embed_dim=768,
+        depth=12,
+        num_heads=12,
+        init_values=1e-5,
+        global_pool='map',
+        reg_tokens=1,
     ),
     'naflexvit_so150m2_patch16_reg1_gap': NaFlexVitCfg(
-        patch_size=16, embed_dim=832, depth=21, num_heads=13, mlp_ratio=34 / 13,
-        init_values=1e-5, qkv_bias=False, reg_tokens=1,
-        global_pool='avg', fc_norm=True,
+        patch_size=16,
+        embed_dim=832,
+        depth=21,
+        num_heads=13,
+        mlp_ratio=34 / 13,
+        init_values=1e-5,
+        qkv_bias=False,
+        reg_tokens=1,
+        global_pool='avg',
+        fc_norm=True,
     ),
     'naflexvit_so150m2_patch16_reg1_map': NaFlexVitCfg(
-        patch_size=16, embed_dim=832, depth=21, num_heads=13, mlp_ratio=34 / 13,
-        init_values=1e-5, qkv_bias=False, reg_tokens=1, global_pool='map',
+        patch_size=16,
+        embed_dim=832,
+        depth=21,
+        num_heads=13,
+        mlp_ratio=34 / 13,
+        init_values=1e-5,
+        qkv_bias=False,
+        reg_tokens=1,
+        global_pool='map',
     ),
     'naflexvit_base_patch16_siglip': NaFlexVitCfg(
-        patch_size=16, embed_dim=768, depth=12, num_heads=12,
-        act_layer='gelu_tanh', global_pool='map',
+        patch_size=16,
+        embed_dim=768,
+        depth=12,
+        num_heads=12,
+        act_layer='gelu_tanh',
+        global_pool='map',
     ),
     'naflexvit_so400m_patch16_siglip': NaFlexVitCfg(
-        patch_size=16, embed_dim=1152, depth=27, num_heads=16, mlp_ratio=3.7362,
-        act_layer='gelu_tanh', global_pool='map',
+        patch_size=16,
+        embed_dim=1152,
+        depth=27,
+        num_heads=16,
+        mlp_ratio=3.7362,
+        act_layer='gelu_tanh',
+        global_pool='map',
     ),
 }
 

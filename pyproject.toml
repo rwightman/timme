@@ -48,3 +48,10 @@ test = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.wruff]
+line-length = 120
+
+[tool.wruff.format]
+quote-style = "preserve"
+preview = true

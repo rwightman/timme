@@ -192,7 +192,7 @@ class SpatialNormMlpHead(ImageHead):
             # Handle conv<->linear swap for pre_logits MLP
             cur_fc = self.pre_logits.fc
             if (isinstance(cur_fc, nn.Conv2d) and not self.use_conv) or (
-                    isinstance(cur_fc, nn.Linear) and self.use_conv
+                isinstance(cur_fc, nn.Linear) and self.use_conv
             ):
                 with torch.no_grad():
                     new_fc = linear_layer(self._in_features, self._hidden_size)

@@ -2,7 +2,7 @@
 
 `timme` is an experimental refactor of [timm](https://github.com/huggingface/pytorch-image-models) that splits every image model into a reusable **encoder** and a separate **head**. It's a thin layer on top of timm — for now it reuses timm's blocks, layers, hub integration, and pretrained-weight infrastructure, while exposing a cleaner API for feature extraction, head swapping, and weight remapping.
 
-> **Status:** alpha / proof-of-concept. 7 model families wired (~89 variants). The shape of the public API is settling but not stable. Not production-ready.
+> **Status:** alpha / proof-of-concept. 9 model families wired (~109 variants). The shape of the public API is settling but not stable. Not production-ready.
 
 ## Why
 
@@ -67,7 +67,7 @@ from timme import create_model
 
 ## What's implemented
 
-89 variants across 7 families, all exact-matching timm pretrained weights:
+109 variants across 9 families, all exact-matching timm pretrained weights:
 
 | family       | example variants                                                        |
 |--------------|-------------------------------------------------------------------------|
@@ -78,14 +78,26 @@ from timme import create_model
 | ByobNet      | ~70 variants — gernet, resnet51q, regnetz, eca_resnet, etc.             |
 | DeiT         | `deit_*`, `deit3_*`, distilled `deit_*_distilled_*`                     |
 | LeViT        | `levit_128/192/256/384`, conv-mode variants                             |
+| NaFlexViT    | `naflexvit_base/so150m2/so400m_patch16_*` (gap, par_gap, map, siglip)   |
+| EVA / EVA02  | `eva_giant_patch14_*`, `eva02_tiny/small/base/large_patch14_*`, CLIP    |
 
 9 canonical heads cover the head-side variability (5 spatial for CNNs, 4 token for transformers). See [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## What's not implemented yet
 
-- Most timm families beyond the 7 above. Each one needs the same wiring: encoder class + `WeightLayout` + builder + `register_family(...)`.
-- Custom training script. Use timm's `train.py` / `validate.py` with `from timme import create_model`.
-- Standalone hub story. timme reuses `timm.models._registry` and `timm.models._builder.load_pretrained`, so it relies on timm's hub integration.
+- The remaining ~80 timm families. Each one needs the same wiring: encoder class + `WeightLayout` + builder + `register_family(...)`.
+- Custom training / validation scripts. Use timm's `train.py` / `validate.py` with `from timme import create_model`.
+- Standalone hub story. timme reuses `timm.models._registry` for pretrained_cfg metadata and `timm.models._builder.load_pretrained` for downloads, so it depends on timm's hub integration today.
+- Standalone layer primitives. `timme.layers` is a placeholder; blocks/norms/activations/attention pools are imported from `timm.layers`.
+
+## Roadmap
+
+The plan is for timme to grow into a fully standalone replacement for timm. Near-term priorities:
+
+1. **More families** — work through the rest of timm's model zoo, prioritizing actively-developed ones.
+2. **Vendor / fork shared layers** as needed — the runtime dep on timm is fine for v0 but limits independent evolution.
+3. **Training/validation scripts** native to timme (currently we ride on timm's).
+4. **Hub integration** — read pretrained metadata from timme's own registry instead of borrowing timm's.
 
 ## License
 

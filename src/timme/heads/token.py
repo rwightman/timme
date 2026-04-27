@@ -1,9 +1,9 @@
 """Token heads (NLC encoder output — ViTs, transformers, sequence models).
 
-  TokenLinearHead    token/avg/max pool -> [norm] -> drop -> fc
-  TokenNormMlpHead   pool -> norm -> [mlp] -> drop -> fc
-  TokenSelectHead    select index -> [norm] -> drop -> fc   (for distilled models)
-  TokenAttentionHead attn_pool -> [norm] -> drop -> fc
+TokenLinearHead    token/avg/max pool -> [norm] -> drop -> fc
+TokenNormMlpHead   pool -> norm -> [mlp] -> drop -> fc
+TokenSelectHead    select index -> [norm] -> drop -> fc   (for distilled models)
+TokenAttentionHead attn_pool -> [norm] -> drop -> fc
 """
 
 from __future__ import annotations

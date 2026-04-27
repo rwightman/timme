@@ -141,11 +141,11 @@ def _adjust_pretrained_cfg(
     def _rewrite(name: str) -> str:
         new = _remap_single_key(name, layout)
         if target == 'encoder' and new.startswith('encoder.'):
-            return new[len('encoder.'):]
+            return new[len('encoder.') :]
         if target == 'head':
             for ns in ('head.', 'head_dist.'):
                 if new.startswith(ns):
-                    return new[len(ns):]
+                    return new[len(ns) :]
         return new
 
     for field in ('first_conv', 'classifier'):

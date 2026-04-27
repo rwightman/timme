@@ -510,36 +510,68 @@ VIT_WEIGHT_LAYOUT = WeightLayout(
 
 VIT_CFGS = {
     'vit_tiny_patch16_224': VisionTransformerCfg(
-        patch_size=16, embed_dim=192, depth=12, num_heads=3,
+        patch_size=16,
+        embed_dim=192,
+        depth=12,
+        num_heads=3,
     ),
     'vit_small_patch16_224': VisionTransformerCfg(
-        patch_size=16, embed_dim=384, depth=12, num_heads=6,
+        patch_size=16,
+        embed_dim=384,
+        depth=12,
+        num_heads=6,
     ),
     'vit_base_patch16_224': VisionTransformerCfg(
-        patch_size=16, embed_dim=768, depth=12, num_heads=12,
+        patch_size=16,
+        embed_dim=768,
+        depth=12,
+        num_heads=12,
     ),
     'vit_large_patch16_224': VisionTransformerCfg(
-        patch_size=16, embed_dim=1024, depth=24, num_heads=16,
+        patch_size=16,
+        embed_dim=1024,
+        depth=24,
+        num_heads=16,
     ),
     'vit_huge_patch14_224': VisionTransformerCfg(
-        patch_size=14, embed_dim=1280, depth=32, num_heads=16,
+        patch_size=14,
+        embed_dim=1280,
+        depth=32,
+        num_heads=16,
     ),
     # 384 input
     'vit_base_patch16_384': VisionTransformerCfg(
-        patch_size=16, embed_dim=768, depth=12, num_heads=12, img_size=384,
+        patch_size=16,
+        embed_dim=768,
+        depth=12,
+        num_heads=12,
+        img_size=384,
     ),
     'vit_large_patch16_384': VisionTransformerCfg(
-        patch_size=16, embed_dim=1024, depth=24, num_heads=16, img_size=384,
+        patch_size=16,
+        embed_dim=1024,
+        depth=24,
+        num_heads=16,
+        img_size=384,
     ),
     # CLIP-style ViT with pre_norm
     'vit_base_patch16_clip_224': VisionTransformerCfg(
-        patch_size=16, embed_dim=768, depth=12, num_heads=12,
-        pre_norm=True, no_embed_class=True,
+        patch_size=16,
+        embed_dim=768,
+        depth=12,
+        num_heads=12,
+        pre_norm=True,
+        no_embed_class=True,
     ),
     # DINOv2 register tokens
     'vit_base_patch14_reg4_dinov2': VisionTransformerCfg(
-        patch_size=14, embed_dim=768, depth=12, num_heads=12,
-        reg_tokens=4, no_embed_class=True, class_token=True,
+        patch_size=14,
+        embed_dim=768,
+        depth=12,
+        num_heads=12,
+        reg_tokens=4,
+        no_embed_class=True,
+        class_token=True,
     ),
 }
 

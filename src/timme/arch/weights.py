@@ -67,7 +67,7 @@ def remap_state_dict(
         # Apply explicit pre-split renames first (intra-key mutations).
         for old_prefix, new_prefix in layout.renames:
             if key == old_prefix or key.startswith(old_prefix + '.'):
-                new_key = new_prefix + key[len(old_prefix):]
+                new_key = new_prefix + key[len(old_prefix) :]
                 break
 
         root = new_key.split('.', 1)[0]
@@ -87,7 +87,7 @@ def remap_state_dict(
         if matched_prefix is None:
             continue  # unrecognized key
 
-        remapped = matched_prefix + new_key[len(root):]
+        remapped = matched_prefix + new_key[len(root) :]
 
         if target == 'classifier':
             out[remapped] = value
@@ -109,7 +109,7 @@ def _strip_namespace(key: str, namespace: str) -> str:
     given how remap routes targets to namespaces)."""
     prefix = namespace + '.'
     if key.startswith(prefix):
-        return key[len(prefix):]
+        return key[len(prefix) :]
     if key == namespace:
         return ''
     return key

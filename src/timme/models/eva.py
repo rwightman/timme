@@ -161,10 +161,8 @@ class Eva(ImageEncoder):
 
         if cfg is None:
             from dataclasses import fields as _fields
-            cfg = EvaCfg(**{
-                k: v for k, v in kwargs.items()
-                if k in {f.name for f in _fields(EvaCfg)}
-            })
+
+            cfg = EvaCfg(**{k: v for k, v in kwargs.items() if k in {f.name for f in _fields(EvaCfg)}})
         else:
             cfg = cfg.overlay(**kwargs)
 
@@ -213,21 +211,20 @@ class Eva(ImageEncoder):
         # Tokens
         self.cls_token = nn.Parameter(torch.empty(1, 1, cfg.embed_dim, **dd)) if cfg.class_token else None
         self.reg_token = (
-            nn.Parameter(torch.empty(1, cfg.num_reg_tokens, cfg.embed_dim, **dd))
-            if cfg.num_reg_tokens else None
+            nn.Parameter(torch.empty(1, cfg.num_reg_tokens, cfg.embed_dim, **dd)) if cfg.num_reg_tokens else None
         )
         self.cls_embed = cfg.class_token and self.reg_token is None
 
         # Abs pos embed
         num_pos_tokens = num_patches if cfg.no_embed_class else num_patches + self.num_prefix_tokens
         self.pos_embed = (
-            nn.Parameter(torch.empty(1, num_pos_tokens, cfg.embed_dim, **dd))
-            if cfg.use_abs_pos_emb else None
+            nn.Parameter(torch.empty(1, num_pos_tokens, cfg.embed_dim, **dd)) if cfg.use_abs_pos_emb else None
         )
         self.pos_drop = nn.Dropout(p=cfg.pos_drop_rate)
         if cfg.patch_drop_rate > 0:
             self.patch_drop = PatchDropoutWithIndices(
-                cfg.patch_drop_rate, num_prefix_tokens=self.num_prefix_tokens,
+                cfg.patch_drop_rate,
+                num_prefix_tokens=self.num_prefix_tokens,
             )
         else:
             self.patch_drop = None
@@ -248,11 +245,13 @@ class Eva(ImageEncoder):
                 rope_kwargs.update(dict(depth=cfg.depth))
                 self.rope_mixed = True
             elif cfg.rope_type == 'cat':
-                rope_kwargs.update(dict(
-                    in_pixels=False,
-                    grid_offset=cfg.rope_grid_offset,
-                    ref_feat_shape=ref_feat_shape,
-                ))
+                rope_kwargs.update(
+                    dict(
+                        in_pixels=False,
+                        grid_offset=cfg.rope_grid_offset,
+                        ref_feat_shape=ref_feat_shape,
+                    )
+                )
             self.rope = create_rope_embed(rope_type=cfg.rope_type, **rope_kwargs)
         else:
             self.rope = None
@@ -365,13 +364,15 @@ class Eva(ImageEncoder):
             num_prefix_tokens = 0 if self.no_embed_class else self.num_prefix_tokens
             num_new_tokens = self.patch_embed.num_patches + num_prefix_tokens
             if num_new_tokens != self.pos_embed.shape[1]:
-                self.pos_embed = nn.Parameter(resample_abs_pos_embed(
-                    self.pos_embed,
-                    new_size=self.patch_embed.grid_size,
-                    old_size=prev_grid_size,
-                    num_prefix_tokens=num_prefix_tokens,
-                    verbose=True,
-                ))
+                self.pos_embed = nn.Parameter(
+                    resample_abs_pos_embed(
+                        self.pos_embed,
+                        new_size=self.patch_embed.grid_size,
+                        old_size=prev_grid_size,
+                        num_prefix_tokens=num_prefix_tokens,
+                        verbose=True,
+                    )
+                )
         if self.rope is not None:
             self.rope.update_feat_shape(self.patch_embed.grid_size)
 
@@ -512,9 +513,7 @@ class Eva(ImageEncoder):
 
         if reshape:
             H, W = self.patch_embed.dynamic_feat_size((height, width))
-            intermediates = [
-                y.reshape(B, H, W, -1).permute(0, 3, 1, 2).contiguous() for y in intermediates
-            ]
+            intermediates = [y.reshape(B, H, W, -1).permute(0, 3, 1, 2).contiguous() for y in intermediates]
 
         if not torch.jit.is_scripting() and return_prefix_tokens and prefix_tokens is not None:
             intermediates = list(zip(intermediates, prefix_tokens))
@@ -586,62 +585,135 @@ EVA_WEIGHT_LAYOUT = WeightLayout(
 EVA_CFGS: Dict[str, EvaCfg] = {
     # EVA giant — abs pos embed, avg pool, no swiglu
     'eva_giant_patch14_224': EvaCfg(
-        img_size=224, patch_size=14, embed_dim=1408, depth=40, num_heads=16,
+        img_size=224,
+        patch_size=14,
+        embed_dim=1408,
+        depth=40,
+        num_heads=16,
         mlp_ratio=6144 / 1408,
     ),
     'eva_giant_patch14_336': EvaCfg(
-        img_size=336, patch_size=14, embed_dim=1408, depth=40, num_heads=16,
+        img_size=336,
+        patch_size=14,
+        embed_dim=1408,
+        depth=40,
+        num_heads=16,
         mlp_ratio=6144 / 1408,
     ),
     'eva_giant_patch14_560': EvaCfg(
-        img_size=560, patch_size=14, embed_dim=1408, depth=40, num_heads=16,
+        img_size=560,
+        patch_size=14,
+        embed_dim=1408,
+        depth=40,
+        num_heads=16,
         mlp_ratio=6144 / 1408,
     ),
     # EVA02 — RoPE + SwiGLU + scale_mlp
     'eva02_tiny_patch14_224': EvaCfg(
-        img_size=224, patch_size=14, embed_dim=192, depth=12, num_heads=3,
-        mlp_ratio=4 * 2 / 3, swiglu_mlp=True, use_rot_pos_emb=True,
+        img_size=224,
+        patch_size=14,
+        embed_dim=192,
+        depth=12,
+        num_heads=3,
+        mlp_ratio=4 * 2 / 3,
+        swiglu_mlp=True,
+        use_rot_pos_emb=True,
         ref_feat_shape=(16, 16),
     ),
     'eva02_small_patch14_224': EvaCfg(
-        img_size=224, patch_size=14, embed_dim=384, depth=12, num_heads=6,
-        mlp_ratio=4 * 2 / 3, swiglu_mlp=True, use_rot_pos_emb=True,
+        img_size=224,
+        patch_size=14,
+        embed_dim=384,
+        depth=12,
+        num_heads=6,
+        mlp_ratio=4 * 2 / 3,
+        swiglu_mlp=True,
+        use_rot_pos_emb=True,
         ref_feat_shape=(16, 16),
     ),
     'eva02_base_patch14_224': EvaCfg(
-        img_size=224, patch_size=14, embed_dim=768, depth=12, num_heads=12,
-        qkv_fused=False, mlp_ratio=4 * 2 / 3, swiglu_mlp=True, scale_mlp=True,
-        use_rot_pos_emb=True, ref_feat_shape=(16, 16),
+        img_size=224,
+        patch_size=14,
+        embed_dim=768,
+        depth=12,
+        num_heads=12,
+        qkv_fused=False,
+        mlp_ratio=4 * 2 / 3,
+        swiglu_mlp=True,
+        scale_mlp=True,
+        use_rot_pos_emb=True,
+        ref_feat_shape=(16, 16),
     ),
     'eva02_large_patch14_224': EvaCfg(
-        img_size=224, patch_size=14, embed_dim=1024, depth=24, num_heads=16,
-        qkv_fused=False, mlp_ratio=4 * 2 / 3, swiglu_mlp=True, scale_mlp=True,
-        use_rot_pos_emb=True, ref_feat_shape=(16, 16),
+        img_size=224,
+        patch_size=14,
+        embed_dim=1024,
+        depth=24,
+        num_heads=16,
+        qkv_fused=False,
+        mlp_ratio=4 * 2 / 3,
+        swiglu_mlp=True,
+        scale_mlp=True,
+        use_rot_pos_emb=True,
+        ref_feat_shape=(16, 16),
     ),
     'eva02_tiny_patch14_336': EvaCfg(
-        img_size=336, patch_size=14, embed_dim=192, depth=12, num_heads=3,
-        mlp_ratio=4 * 2 / 3, swiglu_mlp=True, use_rot_pos_emb=True,
+        img_size=336,
+        patch_size=14,
+        embed_dim=192,
+        depth=12,
+        num_heads=3,
+        mlp_ratio=4 * 2 / 3,
+        swiglu_mlp=True,
+        use_rot_pos_emb=True,
         ref_feat_shape=(16, 16),
     ),
     'eva02_small_patch14_336': EvaCfg(
-        img_size=336, patch_size=14, embed_dim=384, depth=12, num_heads=6,
-        mlp_ratio=4 * 2 / 3, swiglu_mlp=True, use_rot_pos_emb=True,
+        img_size=336,
+        patch_size=14,
+        embed_dim=384,
+        depth=12,
+        num_heads=6,
+        mlp_ratio=4 * 2 / 3,
+        swiglu_mlp=True,
+        use_rot_pos_emb=True,
         ref_feat_shape=(16, 16),
     ),
     'eva02_base_patch14_448': EvaCfg(
-        img_size=448, patch_size=14, embed_dim=768, depth=12, num_heads=12,
-        qkv_fused=False, mlp_ratio=4 * 2 / 3, swiglu_mlp=True, scale_mlp=True,
-        use_rot_pos_emb=True, ref_feat_shape=(16, 16),
+        img_size=448,
+        patch_size=14,
+        embed_dim=768,
+        depth=12,
+        num_heads=12,
+        qkv_fused=False,
+        mlp_ratio=4 * 2 / 3,
+        swiglu_mlp=True,
+        scale_mlp=True,
+        use_rot_pos_emb=True,
+        ref_feat_shape=(16, 16),
     ),
     'eva02_large_patch14_448': EvaCfg(
-        img_size=448, patch_size=14, embed_dim=1024, depth=24, num_heads=16,
-        qkv_fused=False, mlp_ratio=4 * 2 / 3, swiglu_mlp=True, scale_mlp=True,
-        use_rot_pos_emb=True, ref_feat_shape=(16, 16),
+        img_size=448,
+        patch_size=14,
+        embed_dim=1024,
+        depth=24,
+        num_heads=16,
+        qkv_fused=False,
+        mlp_ratio=4 * 2 / 3,
+        swiglu_mlp=True,
+        scale_mlp=True,
+        use_rot_pos_emb=True,
+        ref_feat_shape=(16, 16),
     ),
     # CLIP variants — pool defaults to 'token', no fc_norm
     'eva_giant_patch14_clip_224': EvaCfg(
-        img_size=224, patch_size=14, embed_dim=1408, depth=40, num_heads=16,
-        mlp_ratio=6144 / 1408, global_pool='token',
+        img_size=224,
+        patch_size=14,
+        embed_dim=1408,
+        depth=40,
+        num_heads=16,
+        mlp_ratio=6144 / 1408,
+        global_pool='token',
     ),
 }
 

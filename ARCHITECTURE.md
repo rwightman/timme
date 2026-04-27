@@ -5,9 +5,10 @@ src/timme/
 ├── __init__.py                # public API: create_model, create_encoder, ABCs, heads, configs
 ├── arch/                      # package vocabulary — depended on by models/ and heads/
 │   ├── __init__.py
-│   ├── encoder.py             # ImageEncoder, ArchTraits
+│   ├── encoder.py             # ImageEncoder
 │   ├── head.py                # ImageHead (also a duck-typed contract)
 │   ├── classifier.py          # ImageClassifier, DistilledImageClassifier
+│   ├── traits.py              # ArchTraits
 │   ├── weights.py             # WeightLayout, remap_state_dict
 │   └── config.py              # ConfigMixin, HeadCfg, ModelSpec
 ├── models/                    # per-family encoders + factory + registry
@@ -19,7 +20,9 @@ src/timme/
 │   ├── mobilenetv3.py         # MobileNetV3Cfg + MobileNetV3 + MOBILENETV3_CFGS + builders
 │   ├── byobnet.py             # ByoModelCfg/ByoBlockCfg + ByobNet + variants + builders
 │   ├── deit.py                # VisionTransformerDistilled + DEIT_CFGS + builders
-│   └── levit.py               # LevitCfg + Levit + LEVIT_CFGS + builders
+│   ├── levit.py               # LevitCfg + Levit + LEVIT_CFGS + builders
+│   ├── naflexvit.py           # NaFlexVitCfg + NaFlexVit + NAFLEXVIT_CFGS + builders
+│   └── eva.py                 # EvaCfg + Eva + EVA_CFGS + builders (EVA / EVA02 / RoPE-ViT)
 ├── heads/                     # 9 canonical classification heads
 │   ├── __init__.py
 │   ├── spatial.py             # 5 NCHW heads
@@ -91,5 +94,13 @@ Identity is the common case; renames cover things like `('classifier', 'head.fc'
 1. Fetch state_dict from URL / HF hub / file (timm handles this).
 2. Unwrap container dicts (`'state_dict'`, `'model'`, ...).
 3. Apply the family's upstream `checkpoint_filter_fn` (pos_embed resize, key renames — still in upstream namespace).
-4. Apply timme's `remap_state_dict` to split into `encoder.*` / `head.*`.
-5. timm's `load_pretrained` adapts `first_conv` for `in_chans` and strips `classifier` weights for `num_classes` mismatch — timme rewrites those keys in the `pretrained_cfg` to point at the timme namespace (`encoder.conv1`, `head.fc`).
+4. Apply timme's `remap_state_dict` to split into the requested target's namespace.
+5. timm's `load_pretrained` adapts `first_conv` for `in_chans` and strips `classifier` weights for `num_classes` mismatch — timme rewrites those keys in the `pretrained_cfg` to point at the right namespace.
+
+`remap_state_dict` honors the load target:
+
+- `target='classifier'` (used by `create_model`) — keys land at `encoder.X` / `head.X` to match the composed `ImageClassifier(encoder, head)` state dict.
+- `target='encoder'` (used by `create_encoder`) — keys land at bare `X`, with the leading `encoder.` stripped so they load directly into a bare `ImageEncoder`.
+- `target='head'` — same treatment for `head.` / `head_dist.` (used internally for head-only loads).
+
+`_adjust_pretrained_cfg` mirrors the same target-aware rewrite on the `first_conv` / `classifier` keys so timm's `load_pretrained` adaptations land on keys that actually exist in the filtered state dict.
