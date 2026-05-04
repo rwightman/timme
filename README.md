@@ -58,12 +58,22 @@ model = timme.create_model('resnet50.a1_in1k', pretrained=True, num_classes=10)
 model = timme.create_model('resnet50.a1_in1k', pretrained=True, in_chans=1)
 ```
 
-`validate.py` from the timm repo works unchanged if you swap the create_model import:
+Native train and validation apps live under `timme.apps` and are installed as console scripts:
 
-```python
-# in validate.py
-from timme import create_model
+```bash
+timme-train-cls --data.path /data/imagenet --model.model resnet50 --scheduler.epochs 100
+timme-train-ssl --data.path /data/imagenet --model.model vit_tiny_patch16_224 --ssl.ssl_method nepa
+timme-eval-cls --data-dir /data/imagenet/validation --model resnet50 --pretrained
+timme-eval-knn --data-dir /data/imagenet --model vit_tiny_patch16_224 --checkpoint /path/to/last.pth.tar
+
+# equivalent module entry points
+python -m timme.apps.train_cls --data.path /data/imagenet --model.model resnet50
+python -m timme.apps.eval_cls --data-dir /data/imagenet/validation --model resnet50 --pretrained
 ```
+
+The SSL app is encoder-native: `timme-train-ssl` builds a bare `timme.create_encoder(...)`
+via `create_train_model(..., target='encoder')`, and `timme-eval-knn` loads checkpoints
+back into a bare encoder. This is the intended timme path for representation learning.
 
 ## What's implemented
 
@@ -86,7 +96,7 @@ from timme import create_model
 ## What's not implemented yet
 
 - The remaining ~80 timm families. Each one needs the same wiring: encoder class + `WeightLayout` + builder + `register_family(...)`.
-- Custom training / validation scripts. Use timm's `train.py` / `validate.py` with `from timme import create_model`.
+- Many advanced application scripts from timm/OpenCLIP are not ported yet. Classification and SSL task apps are available in `timme.apps`.
 - Standalone hub story. timme reuses `timm.models._registry` for pretrained_cfg metadata and `timm.models._builder.load_pretrained` for downloads, so it depends on timm's hub integration today.
 - Standalone layer primitives. `timme.layers` is a placeholder; blocks/norms/activations/attention pools are imported from `timm.layers`.
 
@@ -96,7 +106,7 @@ The plan is for timme to grow into a fully standalone replacement for timm. Near
 
 1. **More families** — work through the rest of timm's model zoo, prioritizing actively-developed ones.
 2. **Vendor / fork shared layers** as needed — the runtime dep on timm is fine for v0 but limits independent evolution.
-3. **Training/validation scripts** native to timme (currently we ride on timm's).
+3. **More native apps** — extend the task app base toward additional workflows.
 4. **Hub integration** — read pretrained metadata from timme's own registry instead of borrowing timm's.
 
 ## License

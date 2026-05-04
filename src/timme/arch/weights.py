@@ -18,8 +18,9 @@ into the timm-evolved ``encoder.*`` / ``head.*`` namespaces. Each entry in
 
 from __future__ import annotations
 
+from collections import OrderedDict
 from dataclasses import dataclass
-from typing import Dict, Literal, Optional, Tuple, Union
+from typing import Any, Dict, Literal, Optional, Tuple, Union
 
 import torch
 
@@ -35,6 +36,23 @@ class WeightLayout:
     def __post_init__(self):
         self.encoder = tuple(_normalize_layout_entry(e, 'encoder') for e in self.encoder)
         self.head = tuple(_normalize_layout_entry(e, 'head') for e in self.head)
+
+
+def clean_state_dict(state_dict: Dict[str, Any]) -> Dict[str, Any]:
+    """Remove serialization-only wrapper names from state-dict keys.
+
+    DDP adds a leading ``module.`` wrapper and torch.compile stores wrapped
+    modules under ``_orig_mod``. Root wrappers should not leak into checkpoints,
+    and nested compiled submodules should not leak ``_orig_mod`` either.
+    """
+    cleaned_state_dict = OrderedDict()
+    for key, value in state_dict.items():
+        parts = key.split('.')
+        while parts and parts[0] in ('module', '_orig_mod'):
+            parts.pop(0)
+        parts = [part for part in parts if part != '_orig_mod']
+        cleaned_state_dict['.'.join(parts)] = value
+    return cleaned_state_dict
 
 
 def _normalize_layout_entry(entry, namespace: str) -> Tuple[str, str]:

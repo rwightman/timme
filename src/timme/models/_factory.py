@@ -25,6 +25,7 @@ Weight loading chain:
 from __future__ import annotations
 
 from dataclasses import dataclass
+from fnmatch import fnmatch
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import torch
@@ -33,7 +34,7 @@ import torch.nn as nn
 from timm.models._builder import load_pretrained
 from timm.models._registry import get_pretrained_cfg, split_model_name_tag
 
-from ..arch import ImageEncoder, ImageClassifier, WeightLayout, remap_state_dict
+from ..arch import ImageEncoder, ImageClassifier, WeightLayout, clean_state_dict, remap_state_dict
 
 
 # ---------------------------------------------------------------------------
@@ -78,9 +79,26 @@ def register_family(
         _VARIANTS[arch_name] = (family_name, cfg)
 
 
-def list_models() -> List[str]:
-    """List registered timme arch names."""
-    return sorted(_VARIANTS.keys())
+def list_models(
+        filter: Union[str, List[str], Tuple[str, ...]] = '',
+        pretrained: bool = False,
+        exclude_filters: Union[str, List[str], Tuple[str, ...]] = '',
+) -> List[str]:
+    """List registered timme arch names.
+
+    Args mirror the commonly used subset of ``timm.list_models`` so reference
+    validation scripts can use this registry directly.
+    """
+    names = sorted(_VARIANTS.keys())
+    if filter:
+        filters = (filter,) if isinstance(filter, str) else tuple(filter)
+        names = [n for n in names if any(fnmatch(n, f) for f in filters)]
+    if exclude_filters:
+        excludes = (exclude_filters,) if isinstance(exclude_filters, str) else tuple(exclude_filters)
+        names = [n for n in names if not any(fnmatch(n, f) for f in excludes)]
+    if pretrained:
+        names = [n for n in names if get_pretrained_cfg(n, allow_unregistered=True) is not None]
+    return names
 
 
 def is_registered(name: str) -> bool:
@@ -110,6 +128,29 @@ def _resolve(name: str) -> Tuple[_FamilyEntry, Any, Dict[str, Any]]:
     pcfg_obj = get_pretrained_cfg(name, allow_unregistered=True)
     pcfg = pcfg_obj.to_dict() if pcfg_obj is not None else {}
     return entry, cfg, pcfg
+
+
+def _merge_pretrained_cfg(
+        pcfg: Dict[str, Any],
+        pretrained_cfg: Optional[Union[str, Dict[str, Any], Any]] = None,
+        pretrained_cfg_overlay: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Apply explicit pretrained cfg inputs using timm-compatible semantics."""
+    if pretrained_cfg is not None:
+        if isinstance(pretrained_cfg, str):
+            pcfg_obj = get_pretrained_cfg(pretrained_cfg, allow_unregistered=True)
+            pcfg = pcfg_obj.to_dict() if pcfg_obj is not None else {}
+        elif hasattr(pretrained_cfg, 'to_dict'):
+            pcfg = pretrained_cfg.to_dict()
+        elif isinstance(pretrained_cfg, dict):
+            pcfg = dict(pretrained_cfg)
+        else:
+            raise TypeError(f"Unsupported pretrained_cfg type: {type(pretrained_cfg).__name__}")
+    else:
+        pcfg = dict(pcfg)
+    if pretrained_cfg_overlay:
+        pcfg.update(pretrained_cfg_overlay)
+    return pcfg
 
 
 def _remap_single_key(key: str, layout: WeightLayout) -> str:
@@ -172,6 +213,7 @@ def _make_filter_fn(entry: _FamilyEntry, target: str = 'classifier') -> Callable
                 if k in state_dict and isinstance(state_dict[k], dict):
                     state_dict = state_dict[k]
                     break
+            state_dict = clean_state_dict(state_dict)
         if entry.checkpoint_filter_fn is not None:
             try:
                 state_dict = entry.checkpoint_filter_fn(state_dict, model)
@@ -182,10 +224,29 @@ def _make_filter_fn(entry: _FamilyEntry, target: str = 'classifier') -> Callable
     return _filter
 
 
-def _apply_local_checkpoint(model: nn.Module, entry: _FamilyEntry, path: str) -> None:
+def _move_to_requested_device_dtype(model: nn.Module, kwargs: Dict[str, Any]) -> None:
+    to_kwargs = {}
+    if kwargs.get('device') is not None:
+        to_kwargs['device'] = kwargs['device']
+    if kwargs.get('dtype') is not None:
+        to_kwargs['dtype'] = kwargs['dtype']
+    if to_kwargs:
+        model.to(**to_kwargs)
+
+
+def _drop_none_kwargs(kwargs: Dict[str, Any]) -> Dict[str, Any]:
+    return {k: v for k, v in kwargs.items() if v is not None}
+
+
+def _apply_local_checkpoint(
+        model: nn.Module,
+        entry: _FamilyEntry,
+        path: str,
+        target: str = 'classifier',
+) -> None:
     """Load a local checkpoint through the same filter chain as pretrained."""
     sd = torch.load(path, map_location='cpu')
-    filter_fn = _make_filter_fn(entry)
+    filter_fn = _make_filter_fn(entry, target=target)
     sd = filter_fn(sd, model)
     result = model.load_state_dict(sd, strict=False)
     if result.missing_keys:
@@ -200,8 +261,11 @@ def _apply_local_checkpoint(model: nn.Module, entry: _FamilyEntry, path: str) ->
 def create_encoder(
         model_name: str,
         pretrained: bool = False,
+        pretrained_cfg: Optional[Union[str, Dict[str, Any]]] = None,
+        pretrained_cfg_overlay: Optional[Dict[str, Any]] = None,
         out_indices: Optional[Union[int, Tuple[int, ...]]] = None,
         checkpoint_path: Optional[str] = None,
+        cache_dir: Optional[Union[str, "os.PathLike[str]"]] = None,
         **kwargs,
 ) -> ImageEncoder:
     """Create an image encoder (no classification head).
@@ -215,12 +279,15 @@ def create_encoder(
         out_indices = tuple(out_indices)
 
     entry, cfg, pcfg = _resolve(model_name)
+    pcfg = _merge_pretrained_cfg(pcfg, pretrained_cfg, pretrained_cfg_overlay)
+    kwargs = _drop_none_kwargs(kwargs)
 
     # Source img_size from pretrained_cfg if user didn't supply one.
     if 'img_size' not in kwargs and pcfg.get('input_size'):
         kwargs['img_size'] = pcfg['input_size'][-2:]
 
     encoder = entry.build_encoder(cfg=cfg, out_indices=out_indices, **kwargs)
+    _move_to_requested_device_dtype(encoder, kwargs)
     encoder.pretrained_cfg = pcfg
     encoder.default_cfg = pcfg
 
@@ -236,9 +303,10 @@ def create_encoder(
             in_chans=kwargs.get('in_chans', 3),
             filter_fn=filter_fn,
             strict=False,
+            cache_dir=cache_dir,
         )
     elif checkpoint_path:
-        _apply_local_checkpoint(encoder, entry, checkpoint_path)
+        _apply_local_checkpoint(encoder, entry, checkpoint_path, target='encoder')
 
     return encoder
 
@@ -246,10 +314,13 @@ def create_encoder(
 def create_model(
         model_name: str,
         pretrained: bool = False,
+        pretrained_cfg: Optional[Union[str, Dict[str, Any]]] = None,
+        pretrained_cfg_overlay: Optional[Dict[str, Any]] = None,
         num_classes: Optional[int] = None,
         global_pool: Optional[str] = None,
         drop_rate: float = 0.0,
         checkpoint_path: Optional[str] = None,
+        cache_dir: Optional[Union[str, "os.PathLike[str]"]] = None,
         # Compat
         features_only: bool = False,
         out_indices: Optional[Union[int, Tuple[int, ...]]] = None,
@@ -266,12 +337,17 @@ def create_model(
         return create_encoder(
             model_name,
             pretrained=pretrained,
+            pretrained_cfg=pretrained_cfg,
+            pretrained_cfg_overlay=pretrained_cfg_overlay,
             out_indices=out_indices,
             checkpoint_path=checkpoint_path,
+            cache_dir=cache_dir,
             **kwargs,
         )
 
     entry, cfg, pcfg = _resolve(model_name)
+    pcfg = _merge_pretrained_cfg(pcfg, pretrained_cfg, pretrained_cfg_overlay)
+    kwargs = _drop_none_kwargs(kwargs)
 
     if 'img_size' not in kwargs and pcfg.get('input_size'):
         kwargs['img_size'] = pcfg['input_size'][-2:]
@@ -283,6 +359,7 @@ def create_model(
         head_kwargs['global_pool'] = global_pool
 
     model = entry.build_classifier(cfg=cfg, **head_kwargs, **kwargs)
+    _move_to_requested_device_dtype(model, kwargs)
     adjusted_pcfg = _adjust_pretrained_cfg(pcfg, entry.weight_layout)
     model.pretrained_cfg = adjusted_pcfg
     model.default_cfg = adjusted_pcfg
@@ -296,6 +373,7 @@ def create_model(
             in_chans=kwargs.get('in_chans', 3),
             filter_fn=filter_fn,
             strict=True,
+            cache_dir=cache_dir,
         )
     elif checkpoint_path:
         _apply_local_checkpoint(model, entry, checkpoint_path)

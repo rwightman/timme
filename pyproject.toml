@@ -26,12 +26,20 @@ classifiers = [
 dependencies = [
     "torch>=2.0",
     "timm>=1.0",
+    "simple-parsing",
 ]
 dynamic = ["version"]
 
 [project.urls]
 homepage = "https://github.com/rwightman/timme"
 repository = "https://github.com/rwightman/timme"
+
+[project.scripts]
+timme-train-cls = "timme.apps.train_cls:main"
+timme-train-ssl = "timme.apps.train_ssl:main"
+timme-eval-cls = "timme.apps.eval_cls:main"
+timme-eval-knn = "timme.apps.eval_knn:main"
+timme-sweep = "timme.apps.sweep:main"
 
 [tool.pdm.version]
 source = "file"

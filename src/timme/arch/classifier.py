@@ -44,6 +44,11 @@ class ImageClassifier(nn.Module):
         return self.encoder.output_dim
 
     @property
+    def in_chans(self) -> int:
+        """Input channel count expected by the encoder."""
+        return getattr(self.encoder, 'in_chans', 3)
+
+    @property
     def head_hidden_size(self) -> int:
         """Dimension of head's pre-logits representation."""
         return self.head.pre_logits_dim
@@ -53,6 +58,12 @@ class ImageClassifier(nn.Module):
 
     def get_classifier(self) -> nn.Module:
         return self.head.get_classifier()
+
+    @torch.jit.ignore
+    def get_patch_size(self):
+        if hasattr(self.encoder, 'get_patch_size'):
+            return self.encoder.get_patch_size()
+        return None
 
     # ------------------------------------------------------------------
     # The split API: maps directly to sub-modules
@@ -135,6 +146,9 @@ class DistilledImageClassifier(ImageClassifier):
     def reset_classifier(self, num_classes: int, global_pool: Optional[str] = None) -> None:
         self.head.reset(num_classes, pool_type=global_pool)
         self.head_dist.reset(num_classes, pool_type=global_pool)
+
+    def set_distilled_training(self, enable: bool = True) -> None:
+        self.distilled_training = enable
 
     def forward_head(self, x: torch.Tensor, pre_logits: bool = False) -> torch.Tensor:
         if pre_logits:
