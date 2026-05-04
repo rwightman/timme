@@ -200,15 +200,13 @@ class SchedulerConfig:
     """Learning rate scheduler configuration."""
 
     sched: str = 'cosine'
-    sched_on_updates: bool = False
     epochs: int = 300
     start_epoch: Optional[int] = None
     decay_epochs: float = 90
     decay_milestones: Tuple[int, ...] = (90, 180, 270)
     decay_rate: float = 0.1
     warmup_epochs: int = 5
-    warmup_lr: float = 1e-5
-    warmup_prefix: bool = False
+    warmup_lr: float = 0.0
     cooldown_epochs: int = 0
     patience_epochs: int = 10
     min_lr: float = 0.0

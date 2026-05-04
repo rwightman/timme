@@ -427,10 +427,7 @@ def train_cls(cfg: TrainConfig) -> Optional[float]:
         start_epoch = resume_epoch if resume_epoch is not None else 0
 
     if lr_scheduler is not None and start_epoch > 0:
-        if cfg.scheduler.sched_on_updates:
-            lr_scheduler.step_update(start_epoch * updates_per_epoch)
-        else:
-            lr_scheduler.step(start_epoch)
+        lr_scheduler.step_update(start_epoch * updates_per_epoch)
 
     # Training loop
     best_metric = None
@@ -471,8 +468,6 @@ def train_cls(cfg: TrainConfig) -> Optional[float]:
             # Validation
             epoch_p_1 = epoch + 1
             if epoch_p_1 % cfg.misc.val_interval != 0 and epoch_p_1 != num_epochs:
-                if lr_scheduler is not None:
-                    lr_scheduler.step(epoch_p_1, metric=None)
                 continue
 
             eval_metrics = None
@@ -523,10 +518,6 @@ def train_cls(cfg: TrainConfig) -> Optional[float]:
             # Save checkpoint
             if saver is not None:
                 best_metric, best_epoch = saver.save_checkpoint(epoch, metric=latest_metric)
-
-            # Step scheduler
-            if lr_scheduler is not None:
-                lr_scheduler.step(epoch_p_1, latest_metric)
 
     except KeyboardInterrupt:
         _logger.info('Training interrupted by user')

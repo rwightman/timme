@@ -162,19 +162,22 @@ def create_train_scheduler(
             optimizer, sched_cfg, updates_per_epoch=1000, device_env
         )
     """
-    # Build scheduler kwargs
+    # Build scheduler kwargs. timme train loops step schedules per optimizer
+    # update only, and always treat warmup as a prefix to the main schedule.
     sched_kwargs = scheduler_kwargs(cfg)
+    sched_kwargs['step_on_epochs'] = False
+    sched_kwargs['warmup_prefix'] = True
 
     # Create scheduler
     lr_scheduler, num_epochs = create_scheduler_v2(
         optimizer,
         **sched_kwargs,
-        updates_per_epoch=updates_per_epoch if cfg.sched_on_updates else 0,
+        updates_per_epoch=updates_per_epoch,
     )
 
     if is_primary(device_env):
         _logger.info(
-            f'Scheduled epochs: {num_epochs}. LR stepped {"per update" if cfg.sched_on_updates else "per epoch"}.'
+            f'Scheduled epochs: {num_epochs}. LR stepped per optimizer update.'
         )
 
     return lr_scheduler, num_epochs
