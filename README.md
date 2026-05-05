@@ -58,26 +58,118 @@ model = timme.create_model('resnet50.a1_in1k', pretrained=True, num_classes=10)
 model = timme.create_model('resnet50.a1_in1k', pretrained=True, in_chans=1)
 ```
 
-Native train and validation apps live under `timme.apps` and are installed as console scripts:
+## Training And Eval Apps
+
+Native task-style apps live under `timme.apps` and are installed as console scripts.
+The intended naming is `train_{task}.py` and `eval_{task}.py`; today that means
+classification training/eval, SSL training, and k-NN representation eval.
 
 ```bash
-timme-train-cls --data.path /data/imagenet --model.model resnet50 --scheduler.epochs 100
+# console scripts
+timme-train-cls --data.path /data/imagenet --model.model resnet50
 timme-train-ssl --data.path /data/imagenet --model.model vit_tiny_patch16_224 --ssl.ssl_method nepa
 timme-eval-cls --data-dir /data/imagenet/validation --model resnet50 --pretrained
 timme-eval-knn --data-dir /data/imagenet --model vit_tiny_patch16_224 --checkpoint /path/to/last.pth.tar
 
-# equivalent module entry points
+# equivalent module entry points, useful from a source checkout
 python -m timme.apps.train_cls --data.path /data/imagenet --model.model resnet50
 python -m timme.apps.eval_cls --data-dir /data/imagenet/validation --model resnet50 --pretrained
 ```
 
-The SSL app is encoder-native: `timme-train-ssl` builds a bare `timme.create_encoder(...)`
-via `create_train_model(..., target='encoder')`, and `timme-eval-knn` loads checkpoints
-back into a bare encoder. This is the intended timme path for representation learning.
+Classification training:
+
+```bash
+torchrun --nproc-per-node=8 -m timme.apps.train_cls \
+  --data.path /data/imagenet \
+  --model.model resnet50 \
+  --model.pretrained true \
+  --loader.batch_size 128 \
+  --scheduler.epochs 100 \
+  --device.amp true
+```
+
+Override the train defaults when needed:
+
+```bash
+timme-train-cls \
+  --data.path /data/imagenet \
+  --model.model convnext_tiny \
+  --optimizer.lr 5e-4 \
+  --optimizer.weight_decay 0.05 \
+  --model.torchcompile inductor
+```
+
+Self-supervised training is encoder-native: `timme-train-ssl` builds a bare
+`timme.create_encoder(...)` via `create_train_model(..., target='encoder')`.
+The SSL tasks train representations directly, without a classifier wrapper/head.
+
+```bash
+# NEPA
+timme-train-ssl \
+  --data.path /data/imagenet \
+  --model.model vit_tiny_patch16_224 \
+  --ssl.ssl_method nepa \
+  --scheduler.epochs 100 \
+  --device.amp true
+
+# LeJEPA multi-view training
+timme-train-ssl \
+  --data.path /data/imagenet \
+  --model.model vit_small_patch16_224 \
+  --ssl.ssl_method lejepa \
+  --ssl.num_views 2 \
+  --ssl.lejepa_lamb 0.02
+```
+
+Evaluate checkpoints:
+
+```bash
+timme-eval-cls \
+  --data-dir /data/imagenet/validation \
+  --model resnet50 \
+  --checkpoint output/train/model_best.pth.tar
+
+timme-eval-knn \
+  --data-dir /data/imagenet \
+  --model vit_tiny_patch16_224 \
+  --checkpoint output/ssl/model_best.pth.tar \
+  --k 1 5 20 100
+```
+
+`timme-eval-knn` also uses `timme.create_encoder(...)` and normalizes task,
+DDP, and `torch.compile` checkpoint wrapper keys before loading into the bare
+encoder. For DDP plus `torch.compile`, the apps apply distributed wrapping before
+task compilation; when gradient checkpointing is enabled, timme disables Dynamo's
+DDP optimizer guard path that is known to fail in recent PyTorch versions.
+
+Config files are YAML dataclass trees with the same dotted keys as the CLI:
+
+```yaml
+model:
+  model: vit_tiny_patch16_224
+data:
+  path: /data/imagenet
+loader:
+  batch_size: 256
+optimizer:
+  opt: adamw
+  lr: 3e-4
+  weight_decay: 0.01
+scheduler:
+  epochs: 100
+  warmup_epochs: 5
+ssl:
+  ssl_method: nepa
+```
+
+```bash
+timme-train-ssl -c configs/nepa_vit.yaml --data.path /data/imagenet
+```
 
 ## What's implemented
 
-109 variants across 9 families, all exact-matching timm pretrained weights:
+Current model coverage is 109 variants across 9 families, all exact-matching
+timm pretrained weights:
 
 | family       | example variants                                                        |
 |--------------|-------------------------------------------------------------------------|
@@ -93,10 +185,18 @@ back into a bare encoder. This is the intended timme path for representation lea
 
 9 canonical heads cover the head-side variability (5 spatial for CNNs, 4 token for transformers). See [ARCHITECTURE.md](ARCHITECTURE.md).
 
+Native apps currently include:
+
+- `timme.apps.train_cls` / `timme-train-cls`: classification, distillation, DDP, AMP, EMA, mixup/cutmix, update-step scheduling.
+- `timme.apps.eval_cls` / `timme-eval-cls`: classifier validation.
+- `timme.apps.train_ssl` / `timme-train-ssl`: encoder-native NEPA and LeJEPA training.
+- `timme.apps.eval_knn` / `timme-eval-knn`: encoder-native k-NN representation eval.
+- `timme.apps.sweep` / `timme-sweep`: lightweight config sweep runner.
+
 ## What's not implemented yet
 
 - The remaining ~80 timm families. Each one needs the same wiring: encoder class + `WeightLayout` + builder + `register_family(...)`.
-- Many advanced application scripts from timm/OpenCLIP are not ported yet. Classification and SSL task apps are available in `timme.apps`.
+- Many advanced application scripts from timm/OpenCLIP are not ported yet. Classification and SSL task apps are the active native paths.
 - Standalone hub story. timme reuses `timm.models._registry` for pretrained_cfg metadata and `timm.models._builder.load_pretrained` for downloads, so it depends on timm's hub integration today.
 - Standalone layer primitives. `timme.layers` is a placeholder; blocks/norms/activations/attention pools are imported from `timm.layers`.
 
