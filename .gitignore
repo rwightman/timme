@@ -32,6 +32,7 @@ env/
 venv/
 ENV/
 .python-version
+uv.lock
 
 # Editor / OS
 .idea/
@@ -54,3 +55,8 @@ Thumbs.db
 *.pth
 *.safetensors
 .cache/
+
+# Misc
+_timm
+_open_clip
+output/

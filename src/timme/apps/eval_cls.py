@@ -617,7 +617,8 @@ def validate(args):
         # warmup, reduce variability of first batch time, especially for comparing torchscript vs non
         if not args.naflex_loader:
             input = torch.randn((args.batch_size,) + tuple(data_config['input_size'])).to(
-                device=device, dtype=model_dtype
+                device=device,
+                dtype=model_dtype,
             )
             if args.channels_last:
                 input = input.contiguous(memory_format=torch.channels_last)

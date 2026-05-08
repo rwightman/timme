@@ -8,6 +8,7 @@ Refs:
 - EVA — https://arxiv.org/abs/2211.07636
 - EVA-02 — https://arxiv.org/abs/2303.11331
 - RoPE-ViT — https://arxiv.org/abs/2403.13298
+- DINOv3 — https://arxiv.org/abs/2508.10104
 """
 
 from __future__ import annotations
@@ -91,6 +92,7 @@ class EvaCfg(ConfigMixin):
 
     # Init / norms
     norm_layer: str = 'layernorm'
+    norm_eps: Optional[float] = None
     init_values: Optional[float] = None
 
     # Tokens
@@ -132,6 +134,13 @@ class EvaCfg(ConfigMixin):
             self.ref_feat_shape = tuple(self.ref_feat_shape)
 
 
+def _resolve_norm_layer(cfg: EvaCfg) -> Callable:
+    norm_layer = get_norm_layer(cfg.norm_layer) or LayerNorm
+    if cfg.norm_eps is not None:
+        norm_layer = partial(norm_layer, eps=cfg.norm_eps)
+    return norm_layer
+
+
 # ======================================================================
 # Encoder
 # ======================================================================
@@ -169,7 +178,7 @@ class Eva(ImageEncoder):
         dd = {'device': device, 'dtype': dtype}
         assert cfg.global_pool in ('', 'avg', 'avgmax', 'max', 'token', 'map')
 
-        norm_layer = get_norm_layer(cfg.norm_layer) or LayerNorm
+        norm_layer = _resolve_norm_layer(cfg)
 
         # Resolve norm / pool placement (mirrors timm.models.eva.Eva)
         activate_pre_norm = cfg.use_pre_transformer_norm
@@ -715,6 +724,216 @@ EVA_CFGS: Dict[str, EvaCfg] = {
         mlp_ratio=6144 / 1408,
         global_pool='token',
     ),
+    # DINOv3 ViT models — RoPE DINOv3 + storage/register tokens, no abs pos embed.
+    'vit_small_patch16_dinov3': EvaCfg(
+        img_size=256,
+        patch_size=16,
+        dynamic_img_size=True,
+        embed_dim=384,
+        depth=12,
+        num_heads=6,
+        qkv_bias=False,
+        init_values=1.0e-5,
+        use_abs_pos_emb=False,
+        use_rot_pos_emb=True,
+        rope_type='dinov3',
+        rope_temperature=100,
+        rope_rotate_half=True,
+        num_reg_tokens=4,
+        use_fc_norm=False,
+        norm_eps=1.0e-5,
+    ),
+    'vit_small_patch16_dinov3_qkvb': EvaCfg(
+        img_size=256,
+        patch_size=16,
+        dynamic_img_size=True,
+        embed_dim=384,
+        depth=12,
+        num_heads=6,
+        qkv_bias=True,
+        init_values=1.0e-5,
+        use_abs_pos_emb=False,
+        use_rot_pos_emb=True,
+        rope_type='dinov3',
+        rope_temperature=100,
+        rope_rotate_half=True,
+        num_reg_tokens=4,
+        use_fc_norm=False,
+        norm_eps=1.0e-5,
+    ),
+    'vit_small_plus_patch16_dinov3': EvaCfg(
+        img_size=256,
+        patch_size=16,
+        dynamic_img_size=True,
+        embed_dim=384,
+        depth=12,
+        num_heads=6,
+        qkv_bias=False,
+        init_values=1.0e-5,
+        swiglu_mlp=True,
+        swiglu_align_to=8,
+        use_abs_pos_emb=False,
+        use_rot_pos_emb=True,
+        rope_type='dinov3',
+        rope_temperature=100,
+        rope_rotate_half=True,
+        num_reg_tokens=4,
+        use_fc_norm=False,
+        norm_eps=1.0e-5,
+    ),
+    'vit_small_plus_patch16_dinov3_qkvb': EvaCfg(
+        img_size=256,
+        patch_size=16,
+        dynamic_img_size=True,
+        embed_dim=384,
+        depth=12,
+        num_heads=6,
+        qkv_bias=True,
+        init_values=1.0e-5,
+        swiglu_mlp=True,
+        swiglu_align_to=8,
+        use_abs_pos_emb=False,
+        use_rot_pos_emb=True,
+        rope_type='dinov3',
+        rope_temperature=100,
+        rope_rotate_half=True,
+        num_reg_tokens=4,
+        use_fc_norm=False,
+        norm_eps=1.0e-5,
+    ),
+    'vit_base_patch16_dinov3': EvaCfg(
+        img_size=256,
+        patch_size=16,
+        dynamic_img_size=True,
+        embed_dim=768,
+        depth=12,
+        num_heads=12,
+        qkv_bias=False,
+        init_values=1.0e-5,
+        use_abs_pos_emb=False,
+        use_rot_pos_emb=True,
+        rope_type='dinov3',
+        rope_temperature=100,
+        rope_rotate_half=True,
+        num_reg_tokens=4,
+        use_fc_norm=False,
+        norm_eps=1.0e-5,
+    ),
+    'vit_base_patch16_dinov3_qkvb': EvaCfg(
+        img_size=256,
+        patch_size=16,
+        dynamic_img_size=True,
+        embed_dim=768,
+        depth=12,
+        num_heads=12,
+        qkv_bias=True,
+        init_values=1.0e-5,
+        use_abs_pos_emb=False,
+        use_rot_pos_emb=True,
+        rope_type='dinov3',
+        rope_temperature=100,
+        rope_rotate_half=True,
+        num_reg_tokens=4,
+        use_fc_norm=False,
+        norm_eps=1.0e-5,
+    ),
+    'vit_large_patch16_dinov3': EvaCfg(
+        img_size=256,
+        patch_size=16,
+        dynamic_img_size=True,
+        embed_dim=1024,
+        depth=24,
+        num_heads=16,
+        qkv_bias=False,
+        init_values=1.0e-5,
+        use_abs_pos_emb=False,
+        use_rot_pos_emb=True,
+        rope_type='dinov3',
+        rope_temperature=100,
+        rope_rotate_half=True,
+        num_reg_tokens=4,
+        use_fc_norm=False,
+        norm_eps=1.0e-5,
+    ),
+    'vit_large_patch16_dinov3_qkvb': EvaCfg(
+        img_size=256,
+        patch_size=16,
+        dynamic_img_size=True,
+        embed_dim=1024,
+        depth=24,
+        num_heads=16,
+        qkv_bias=True,
+        init_values=1.0e-5,
+        use_abs_pos_emb=False,
+        use_rot_pos_emb=True,
+        rope_type='dinov3',
+        rope_temperature=100,
+        rope_rotate_half=True,
+        num_reg_tokens=4,
+        use_fc_norm=False,
+        norm_eps=1.0e-5,
+    ),
+    'vit_huge_plus_patch16_dinov3': EvaCfg(
+        img_size=256,
+        patch_size=16,
+        dynamic_img_size=True,
+        embed_dim=1280,
+        depth=32,
+        num_heads=20,
+        qkv_bias=False,
+        init_values=1.0e-5,
+        swiglu_mlp=True,
+        swiglu_align_to=8,
+        use_abs_pos_emb=False,
+        use_rot_pos_emb=True,
+        rope_type='dinov3',
+        rope_temperature=100,
+        rope_rotate_half=True,
+        num_reg_tokens=4,
+        use_fc_norm=False,
+        norm_eps=1.0e-5,
+    ),
+    'vit_huge_plus_patch16_dinov3_qkvb': EvaCfg(
+        img_size=256,
+        patch_size=16,
+        dynamic_img_size=True,
+        embed_dim=1280,
+        depth=32,
+        num_heads=20,
+        qkv_bias=True,
+        init_values=1.0e-5,
+        swiglu_mlp=True,
+        swiglu_align_to=8,
+        use_abs_pos_emb=False,
+        use_rot_pos_emb=True,
+        rope_type='dinov3',
+        rope_temperature=100,
+        rope_rotate_half=True,
+        num_reg_tokens=4,
+        use_fc_norm=False,
+        norm_eps=1.0e-5,
+    ),
+    'vit_7b_patch16_dinov3': EvaCfg(
+        img_size=256,
+        patch_size=16,
+        dynamic_img_size=True,
+        embed_dim=4096,
+        depth=40,
+        num_heads=32,
+        qkv_bias=False,
+        mlp_ratio=2,
+        init_values=1.0e-5,
+        swiglu_mlp=True,
+        swiglu_align_to=64,
+        use_abs_pos_emb=False,
+        use_rot_pos_emb=True,
+        rope_type='dinov3',
+        rope_temperature=100,
+        rope_rotate_half=True,
+        num_reg_tokens=4,
+        use_fc_norm=False,
+        norm_eps=1.0e-5,
+    ),
 }
 
 
@@ -734,7 +953,7 @@ def create_eva_head(
     cfg = encoder.cfg
     pool_type = global_pool or cfg.global_pool or 'avg'
     embed_dim = encoder.output_dim
-    norm_layer = get_norm_layer(cfg.norm_layer) or LayerNorm
+    norm_layer = _resolve_norm_layer(cfg)
 
     if pool_type == 'map':
         attn_pool = AttentionPoolLatent(

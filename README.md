@@ -168,7 +168,7 @@ timme-train-ssl -c configs/nepa_vit.yaml --data.path /data/imagenet
 
 ## What's implemented
 
-Current model coverage is 109 variants across 9 families, all exact-matching
+Current model coverage is 120 variants across 9 families, all exact-matching
 timm pretrained weights:
 
 | family       | example variants                                                        |
@@ -181,7 +181,7 @@ timm pretrained weights:
 | DeiT         | `deit_*`, `deit3_*`, distilled `deit_*_distilled_*`                     |
 | LeViT        | `levit_128/192/256/384`, conv-mode variants                             |
 | NaFlexViT    | `naflexvit_base/so150m2/so400m_patch16_*` (gap, par_gap, map, siglip)   |
-| EVA / EVA02  | `eva_giant_patch14_*`, `eva02_tiny/small/base/large_patch14_*`, CLIP    |
+| EVA / EVA02  | `eva_giant_patch14_*`, `eva02_*`, CLIP, DINOv3 ViT variants             |
 
 9 canonical heads cover the head-side variability (5 spatial for CNNs, 4 token for transformers). See [ARCHITECTURE.md](ARCHITECTURE.md).
 
