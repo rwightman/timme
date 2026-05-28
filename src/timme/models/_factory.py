@@ -52,6 +52,11 @@ class _FamilyEntry:
 
 _FAMILIES: Dict[str, _FamilyEntry] = {}
 _VARIANTS: Dict[str, Tuple[str, Any]] = {}  # variant arch name -> (family_name, cfg)
+# timme arch name -> timm registry arch name used ONLY for pretrained_cfg lookup.
+# Lets a timme arch carry a different (usually cleaner) name than the timm weights
+# it loads — e.g. the encoder-first 'gemma4_vit_167m' pulls timm's
+# 'gemma4_vit_167m_enc' weights. The pretrained tag (if any) is preserved.
+_PRETRAINED_ALIASES: Dict[str, str] = {}
 
 
 def register_family(
@@ -61,6 +66,7 @@ def register_family(
         build_encoder: Callable[..., ImageEncoder],
         weight_layout: WeightLayout,
         checkpoint_filter_fn: Optional[Callable] = None,
+        pretrained_aliases: Optional[Dict[str, str]] = None,
 ) -> None:
     """Register a model family and all its variants.
 
@@ -72,11 +78,31 @@ def register_family(
         weight_layout: WeightLayout describing timm1 key split.
         checkpoint_filter_fn: optional timm1 per-family filter fn.
             Signature either (state_dict, model) or (state_dict,).
+        pretrained_aliases: optional {timme_arch_name: timm_arch_name} map. When a
+            requested arch is a key here, its pretrained_cfg is looked up under the
+            mapped timm name instead (the tag, if any, is carried over). Use when
+            the timme arch name intentionally differs from the timm weight name.
     """
     entry = _FamilyEntry(build_classifier, build_encoder, weight_layout, checkpoint_filter_fn)
     _FAMILIES[family_name] = entry
     for arch_name, cfg in variants.items():
         _VARIANTS[arch_name] = (family_name, cfg)
+    if pretrained_aliases:
+        _PRETRAINED_ALIASES.update(pretrained_aliases)
+
+
+def _pretrained_lookup_name(name: str) -> str:
+    """Map a timme model name to the timm registry name for pretrained_cfg lookup.
+
+    Applies any per-arch alias from ``register_family(pretrained_aliases=...)``,
+    preserving an explicit pretrained tag. Returns ``name`` unchanged when no
+    alias applies.
+    """
+    arch, tag = split_model_name_tag(name)
+    src_arch = _PRETRAINED_ALIASES.get(arch)
+    if src_arch is None:
+        return name
+    return f'{src_arch}.{tag}' if tag else src_arch
 
 
 def list_models(
@@ -97,7 +123,7 @@ def list_models(
         excludes = (exclude_filters,) if isinstance(exclude_filters, str) else tuple(exclude_filters)
         names = [n for n in names if not any(fnmatch(n, f) for f in excludes)]
     if pretrained:
-        names = [n for n in names if get_pretrained_cfg(n, allow_unregistered=True) is not None]
+        names = [n for n in names if get_pretrained_cfg(_pretrained_lookup_name(n), allow_unregistered=True) is not None]
     return names
 
 
@@ -125,7 +151,7 @@ def _resolve(name: str) -> Tuple[_FamilyEntry, Any, Dict[str, Any]]:
         )
     family_name, cfg = _VARIANTS[arch]
     entry = _FAMILIES[family_name]
-    pcfg_obj = get_pretrained_cfg(name, allow_unregistered=True)
+    pcfg_obj = get_pretrained_cfg(_pretrained_lookup_name(name), allow_unregistered=True)
     pcfg = pcfg_obj.to_dict() if pcfg_obj is not None else {}
     return entry, cfg, pcfg
 
@@ -138,7 +164,9 @@ def _merge_pretrained_cfg(
     """Apply explicit pretrained cfg inputs using timm-compatible semantics."""
     if pretrained_cfg is not None:
         if isinstance(pretrained_cfg, str):
-            pcfg_obj = get_pretrained_cfg(pretrained_cfg, allow_unregistered=True)
+            # Honor pretrained name aliases here too, so a string override that
+            # names a timme arch resolves the same repo as the default lookup.
+            pcfg_obj = get_pretrained_cfg(_pretrained_lookup_name(pretrained_cfg), allow_unregistered=True)
             pcfg = pcfg_obj.to_dict() if pcfg_obj is not None else {}
         elif hasattr(pretrained_cfg, 'to_dict'):
             pcfg = pretrained_cfg.to_dict()

@@ -22,7 +22,8 @@ src/timme/
 │   ├── deit.py                # VisionTransformerDistilled + DEIT_CFGS + builders
 │   ├── levit.py               # LevitCfg + Levit + LEVIT_CFGS + builders
 │   ├── naflexvit.py           # NaFlexVitCfg + NaFlexVit + NAFLEXVIT_CFGS + builders
-│   └── eva.py                 # EvaCfg + Eva + EVA_CFGS + builders (EVA / EVA02 / RoPE-ViT)
+│   ├── eva.py                 # EvaCfg + Eva + EVA_CFGS + builders (EVA / EVA02 / RoPE-ViT)
+│   └── gemma4_vit.py          # Gemma4VitCfg + Gemma4Vit + GEMMA4_CFGS + builders (Gemma4 vision tower)
 ├── heads/                     # 9 canonical classification heads
 │   ├── __init__.py
 │   ├── spatial.py             # 5 NCHW heads
@@ -104,3 +105,5 @@ Identity is the common case; renames cover things like `('classifier', 'head.fc'
 - `target='head'` — same treatment for `head.` / `head_dist.` (used internally for head-only loads).
 
 `_adjust_pretrained_cfg` mirrors the same target-aware rewrite on the `first_conv` / `classifier` keys so timm's `load_pretrained` adaptations land on keys that actually exist in the filtered state dict.
+
+**Pretrained name aliases.** A timme arch name can intentionally differ from the timm name that owns its weights. `register_family(pretrained_aliases={timme_arch: timm_arch})` remaps *only* the pretrained_cfg lookup (the architecture still builds from the timme cfg); an explicit pretrained tag is carried over. Example: timme is encoder-first, so the Gemma4 vision tower is registered as `gemma4_vit_167m` while its weights live under timm's `gemma4_vit_167m_enc` — the alias lets `create_encoder('gemma4_vit_167m', pretrained=True)` resolve the right repo. `list_models(pretrained=True)` honors the same alias.

@@ -63,6 +63,8 @@ from .models import (
     NAFLEXVIT_CFGS,
     EvaCfg,
     EVA_CFGS,
+    Gemma4VitCfg,
+    GEMMA4_CFGS,
 )
 
 __version__ = '0.0.4'
