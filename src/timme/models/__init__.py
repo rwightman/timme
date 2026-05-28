@@ -28,6 +28,7 @@ from .byobnet import ByoBlockCfg, ByoModelCfg
 from .levit import LevitCfg, LEVIT_CFGS
 from .naflexvit import NaFlexVitCfg, NAFLEXVIT_CFGS
 from .eva import EvaCfg, EVA_CFGS
+from .gemma4_vit import Gemma4VitCfg, GEMMA4_CFGS
 from . import deit  # noqa: F401  (registers; no separate cfg dataclass — reuses VisionTransformerCfg)
 
 __all__ = [
@@ -52,4 +53,6 @@ __all__ = [
     'NAFLEXVIT_CFGS',
     'EvaCfg',
     'EVA_CFGS',
+    'Gemma4VitCfg',
+    'GEMMA4_CFGS',
 ]
